@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{9de49aa7-c6ea-4f01-b75f-9672c9533f8e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs">
+      <UniqueIdentifier>{861860b0-f4e8-4894-8742-190bc21e6012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs\TinyXML">
+      <UniqueIdentifier>{a396c6d4-2fac-4793-b833-3240473937bd}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\tinyxml\tinystr.cc">
+      <Filter>Libs\TinyXML</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\tinyxml\tinyxmlparser.cc">
+      <Filter>Libs\TinyXML</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\tinyxml\tinyxmlerror.cc">
+      <Filter>Libs\TinyXML</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\tinyxml\tinyxml.cc">
+      <Filter>Libs\TinyXML</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\data.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\main.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Source\tinyxml\tinystr.h">
+      <Filter>Libs\TinyXML</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\tinyxml\tinyxml.h">
+      <Filter>Libs\TinyXML</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\data.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ga.cuh">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\helper.cuh">
+      <Filter>Source</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Source\ga.cu">
+      <Filter>Source</Filter>
+    </CudaCompile>
+  </ItemGroup>
+</Project>
