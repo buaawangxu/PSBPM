@@ -33,6 +33,7 @@ __device__ void scheFCFS(int * person, float * occupy);
 __device__ void personMoveForward(int * person, size_t ele, size_t step);
 __device__ void fixPerson(int * person);
 
+static int fitvalueCompare(const void *a, const void *b);
 
 
 #endif // ! _GA_CUH_

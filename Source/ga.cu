@@ -554,3 +554,9 @@ __device__ void fixPerson(int * person)
 
     }
 }
+
+static int fitvalueCompare(const void *a, const void *b)
+{
+    return (fitv[(*(size_t *)a)-1] > fitv[(*(size_t *)b)-1]) ? 1: -1;
+}
+
