@@ -55,7 +55,6 @@ void cuGaEvolve()
     // any errors encountered during the launch.
     checkCudaErrors(cudaDeviceSynchronize());
 
-ERROR:
     freeMemOnDevice();
 }
 
@@ -89,11 +88,11 @@ void gaAllocMem()
     checkCudaErrors(cudaMalloc((void **)&h_fitv_s, m_size));
 
 
-    chrm = (int *) calloc(npop * ntask, sizeof(int));
+    chrm = (int *) calloc(2 * npop * ntask, sizeof(int));
     assert(chrm != 0);
-    hashv = (unsigned long *) calloc(npop, sizeof(unsigned long));
+    hashv = (unsigned long *) calloc(2 * npop, sizeof(unsigned long));
     assert(hashv != 0);
-    fitv = (float *) calloc(npop, sizeof(float));
+    fitv = (float *) calloc(2 * npop, sizeof(float));
     assert(fitv != 0);
 }
 
@@ -131,11 +130,18 @@ void dbDisplayWorld()
 {
     size_t i;
 
-    checkCudaErrors(cudaMemcpy(chrm, h_chrm, npop * ntask * sizeof(int), cudaMemcpyDeviceToHost));
-    checkCudaErrors(cudaMemcpy(hashv, h_hashv, npop * sizeof(unsigned long), cudaMemcpyDeviceToHost));
-    checkCudaErrors(cudaMemcpy(fitv, h_fitv, npop * sizeof(float), cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpy(chrm, h_chrm, 2*npop * ntask * sizeof(int), cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpy(hashv, h_hashv, 2*npop * sizeof(unsigned long), cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpy(fitv, h_fitv, 2*npop * sizeof(float), cudaMemcpyDeviceToHost));
 
+    printf("parent----\n");
     for (i = 0; i < npop; i++) {;
+        char tag[100];
+        sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[i], fitv[i]);
+        dbPrintPerson(chrm+i*ntask, ntask, tag);
+    }    
+    printf("children----\n");
+    for (i = npop; i < 2*npop; i++) {;
         char tag[100];
         sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[i], fitv[i]);
         dbPrintPerson(chrm+i*ntask, ntask, tag);
@@ -144,7 +150,7 @@ void dbDisplayWorld()
 
 void gaEvolve(size_t npop, size_t ngen)
 {
-    size_t i, j, k;
+    size_t i;
     gaSetPara<<<1, 1>>>(npop, ngen);
     gaAllocMem();
     size_t msize_occupy;
@@ -157,6 +163,7 @@ void gaEvolve(size_t npop, size_t ngen)
     dbDisplayWorld();
 
     for (i = 0; i < ngen; ++i) {
+        printf("%d generation----------------------\n", i+1);
         gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         dbDisplayWorld();
@@ -207,7 +214,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
 {
     int * dad, * mom, * bro, * sis, * person;
     size_t a, b, tid;
-    size_t i, j, k;
+    size_t j, k;
     bool needCrossover;
 
     float * occupy;
@@ -222,8 +229,8 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
         b = randInt(0, d_npop-1);
         dad = h_chrm + a * d_ntask;
         mom = h_chrm + b * d_ntask;
-        bro = h_chrm + ( 2*tid + d_npop) * d_ntask;
-        sis = h_chrm + ( 2*tid + 1 + d_npop) * d_ntask;
+        bro = h_chrm + (d_npop + 2*tid) * d_ntask;
+        sis = h_chrm + (d_npop + 2*tid+1) * d_ntask;
 
         crossover(dad, mom, bro, sis);
 
@@ -234,13 +241,13 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
             fixPerson(sis);
         }
 
-        h_hashv[2*tid] = hashfunc(bro, d_ntask);
-        h_hashv[2*tid+1] = hashfunc(bro, d_ntask);
+        h_hashv[d_npop + 2*tid] = hashfunc(bro, d_ntask);
+        h_hashv[d_npop + 2*tid+1] = hashfunc(bro, d_ntask);
 
         needCrossover = false;
         for (j = 0; j < d_npop; j++) {
             // check for brother
-            if (h_hashv[2*tid] == h_hashv[j]) {
+            if (h_hashv[d_npop + 2*tid] == h_hashv[j]) {
                 person = h_chrm + j*d_ntask;
                 for (k = 0; k < d_ntask; k++) {
                     if (bro[k] != person[k])
@@ -253,7 +260,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
                 }
             }
             // check for sister
-            if (h_hashv[2*tid+1] == h_hashv[j]) {
+            if (h_hashv[d_npop + 2*tid+1] == h_hashv[j]) {
                 person = h_chrm + j*d_ntask;
                 for (k = 0; k < d_ntask; k++) {
                     if (sis[k] != person[k])
@@ -266,11 +273,11 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
                 }
             }
         }
+    }
 
-        if (!needCrossover) {
-            h_fitv[2*tid] = gaObject(bro, occupy);
-            h_fitv[2*tid+1] = gaObject(sis, occupy);
-        }
+    if (!needCrossover) {
+        h_fitv[d_npop + 2*tid] = gaObject(bro, occupy);
+        h_fitv[d_npop + 2*tid+1] = gaObject(sis, occupy);
     }
 
     __syncthreads();
