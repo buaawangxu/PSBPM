@@ -199,7 +199,6 @@ __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv)
             int tmp;
             tmp=a; a=b; b=tmp;
         }
-
         swapBits(a, b, person);
     }
 
@@ -242,7 +241,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
         }
 
         h_hashv[d_npop + 2*tid] = hashfunc(bro, d_ntask);
-        h_hashv[d_npop + 2*tid+1] = hashfunc(bro, d_ntask);
+        h_hashv[d_npop + 2*tid+1] = hashfunc(sis, d_ntask);
 
         needCrossover = false;
         for (j = 0; j < d_npop; j++) {
