@@ -8,6 +8,9 @@
 #define MAX_CHRM_LEN 1000
 #define MAX_SHARED_MEM 49152
 
+#define PROB_CROSSOVER (0.8f)
+#define PROB_MUTATION (0.005f)
+
 void cuGaEvolve();
 void gaAllocMem();
 void gaFreeMem();
@@ -18,8 +21,10 @@ static void dbPrintPerson(int * person, size_t n, char * tag);
 __global__ void gaSetPara(size_t npop, size_t ngen);
 __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
 __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
+__global__ void gaMutation(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
 
 __device__ void crossover(int * dad, int * mom, int * bro, int * sis);
+__device__ void mutation(int * person);
 __device__ bool swapBits(size_t a, size_t b, int * person);
 __device__ unsigned long hashfunc(int * person, size_t num);
 __device__ float gaObject(int * person, float * occupy);

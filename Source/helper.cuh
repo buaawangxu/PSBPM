@@ -22,11 +22,17 @@ void allocMemOnDevice();
 void freeMemOnDevice();
 void moveDataToDevice();
 
-__device__ void randInt(size_t * result, const int min, const int max);
-__device__ bool isDepend(size_t ipred, size_t isucc);
-__device__ bool isAssign(size_t itask, size_t ireso);
-__device__ float getDuration(size_t itask);
-__device__ void clearResouceOccupy(float * occupy);
+#define IS_DEPEND(ipred, isucc) \
+    (d_depd[((ipred)-1)+((isucc)-1)*d_ntask])
+
+#define IS_ASSIGN(itask, ireso) \
+    (d_asgn[((itask)-1)+((ireso)-1)*d_ntask])
+
+#define DURATION(itask) \
+    (d_dura[(itask)-1])
+
+__device__ size_t randInt(const size_t min, const size_t max);
+__device__ float randProb();__device__ void clearResouceOccupy(float * occupy);
 __device__ float allocResouce(size_t ireso, float duration, float * occupy);
 __device__ float getTotalOccupy(size_t ireso, float * occupy);
 __device__ float getMaxTotalOccupy(float * occupy);
@@ -111,21 +117,6 @@ void moveDataToDevice()
     // dataFreeMemory();
 }
 
-__device__ bool isDepend(size_t ipred, size_t isucc)
-{
-    return d_depd[(ipred-1) + (isucc-1) * d_ntask];
-}
-
-__device__ bool isAssign(size_t itask, size_t ireso)
-{
-    return d_asgn[(itask-1) + (ireso-1) * d_ntask];
-}
-
-__device__ float getDuration(size_t itask)
-{
-    return d_dura[itask-1];
-}
-
 __device__ void clearResouceOccupy(float * occupy)
 {
     size_t i;
@@ -174,12 +165,21 @@ __global__ void setupRandSeed(unsigned long long seed)
                 &d_states[tid]);
 }
 
-__device__ void randInt(size_t * result, const int min, const int max) 
+__device__ size_t randInt(const size_t min, const size_t max) 
 {
     size_t tid = threadIdx.x;
 
     /* curand works like rand - except that it takes a state as a parameter */
-    *result = min + curand(&d_states[tid]) % (max - min);
+    return (min + curand(&d_states[tid]) % (max - min));
+}
+
+__device__ float randProb()
+{
+    unsigned int result; 
+    size_t tid = threadIdx.x;
+    result = curand(&d_states[tid]) % 100000;
+
+    return (float) result / 100000.0f;
 }
 
 #endif // !_HELPER_CUH_

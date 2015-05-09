@@ -144,6 +144,7 @@ void dbDisplayWorld()
 
 void gaEvolve(size_t npop, size_t ngen)
 {
+    size_t i, j, k;
     gaSetPara<<<1, 1>>>(npop, ngen);
     gaAllocMem();
     size_t msize_occupy;
@@ -154,6 +155,13 @@ void gaEvolve(size_t npop, size_t ngen)
     }
     gaInit<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
     dbDisplayWorld();
+
+    for (i = 0; i < ngen; ++i) {
+        gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
+        gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
+        dbDisplayWorld();
+    }
+
     gaFreeMem();
 }
 
@@ -178,7 +186,7 @@ __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv)
 
     size_t a, b;
     for (i = 0; i < d_ntask; i++) {
-        randInt(&a, 0, d_ntask-1);
+        a = randInt(0, d_ntask-1);
         b = i; 
         if (a > b) {
             int tmp;
@@ -210,8 +218,8 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
     
     needCrossover = true;
     while (needCrossover) { 
-        randInt(&a, 0, d_npop-1);
-        randInt(&b, 0, d_npop-1);
+        a = randInt(0, d_npop-1);
+        b = randInt(0, d_npop-1);
         dad = h_chrm + a * d_ntask;
         mom = h_chrm + b * d_ntask;
         bro = h_chrm + ( 2*tid + d_npop) * d_ntask;
@@ -264,6 +272,8 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
             h_fitv[2*tid+1] = gaObject(sis, occupy);
         }
     }
+
+    __syncthreads();
 }
 
 /************************************************************************/
@@ -273,8 +283,8 @@ __device__ void crossover(int * dad, int * mom, int * bro, int * sis)
 {
     size_t i, j, k, a, b;
     int dad_new[MAX_CHRM_LEN], mom_new[MAX_CHRM_LEN];
-    randInt(&a, 0, d_ntask-1);
-    randInt(&b, 0, d_ntask-1);
+    a = randInt(0, d_ntask-1);
+    b = randInt(0, d_ntask-1);
     if (a > b) {
         size_t tmp;
         tmp=a; a=b; b=tmp;
@@ -333,6 +343,53 @@ __device__ void crossover(int * dad, int * mom, int * bro, int * sis)
 
 }
 
+__global__ void gaMutation(int * h_chrm, unsigned long * h_hashv, float * h_fitv)
+{
+    int * person;
+    size_t tid;
+
+    float * occupy;
+    extern __shared__ float sh_occupys[];
+
+    tid = threadIdx.x;
+    occupy = sh_occupys + tid * d_nreso;
+
+    if (randProb() < PROB_MUTATION) {
+        // mutate n-th parent
+        person = h_chrm + tid * d_ntask;
+        mutation(person);
+        h_hashv[tid] = hashfunc(person, d_ntask);
+        h_fitv[tid] = gaObject(person, occupy);
+    }
+    if (randProb() < PROB_MUTATION) {
+        // mutate n-th child
+        person = h_chrm + (tid+d_npop)*d_ntask;
+        mutation(person);
+        h_hashv[tid+d_npop] = hashfunc(person, d_ntask);
+        h_fitv[tid+d_npop]  = gaObject(person, occupy);
+    }
+    
+    __syncthreads();
+}
+
+/************************************************************************/
+/* two points swap mutation                                             */
+/************************************************************************/
+__device__ void mutation(int * person)
+{
+    size_t a, b;
+
+    a = randInt(0, d_ntask-1);
+    b = randInt(0, d_ntask-1);
+    if (a > b) {
+        size_t tmp;
+        tmp=a; a=b; b=tmp;
+    }
+
+    swapBits(a, b, person);
+
+}
+
 /****************************************************************************/
 /* return true, if a-th task swap with b-th task; otherwise, return false.  */
 /****************************************************************************/
@@ -348,11 +405,11 @@ __device__ bool swapBits(size_t a, size_t b, int * person)
         b_itask = person[b];
         for (i = a; i <= b; i++) {
             k_itask = person[i];
-            if ( (i!=a) && isDepend(a_itask, k_itask) ){
+            if ( (i!=a) && IS_DEPEND(a_itask, k_itask) ){
                 ret = false;
                 break;
             }
-            if ( (i!=b) && isDepend(k_itask, b_itask) ) {
+            if ( (i!=b) && IS_DEPEND(k_itask, b_itask) ) {
                 ret = false;
                 break;
             }
@@ -408,7 +465,7 @@ __device__ bool check(int * person)
             i_itask = person[i];
             j_itask = person[j];
 
-            if (isDepend(j_itask, i_itask)) {
+            if (IS_DEPEND(j_itask, i_itask)) {
                 // printf("failed depend %d -> %d\n", j_itask, i_itask);
                 return false;
             }
@@ -428,12 +485,12 @@ __device__ void scheFCFS(int * person, float * occupy)
     clearResouceOccupy(occupy);
     for (i = 0; i < d_ntask; i++) {
         itask = person[i];
-        float dura = getDuration(itask);
+        float dura = DURATION(itask);
 
         size_t min_id = 0;
         float min_occ, occ;
         for (r = 1; r <= d_nreso; r++) { // search all resources
-            if (isAssign(itask,r)) {
+            if (IS_ASSIGN(itask,r)) {
                 if (min_id == 0) {
                     min_occ = getTotalOccupy(r, occupy);
                     min_id = r;
@@ -478,7 +535,7 @@ __device__ void fixPerson(int * person)
         // Number of steps to move elements forward?
         step = 0;
         for (j = i+1; j < d_ntask; j++) {
-            if (isDepend(person[j], person[i]))
+            if (IS_DEPEND(person[j], person[i]))
                 step = j-i;
         }
 
