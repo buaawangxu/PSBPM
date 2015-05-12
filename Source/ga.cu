@@ -616,3 +616,4 @@ static int fitvalueCompare(const void *a, const void *b)
 {
     return (fitv[(*(size_t *)a)] > fitv[(*(size_t *)b)]) ? 1: -1;
 }
+
