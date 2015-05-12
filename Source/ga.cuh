@@ -22,7 +22,11 @@ void gaAllocMem();
 void gaFreeMem();
 void dbDisplayWorld();
 void gaEvolve(size_t npop, size_t ngen);
+void gaSelection();
+void gaStatistics(FILE * out);
+
 static void dbPrintPerson(int * person, size_t n, char * tag);
+static int fitvalueCompare(const void *a, const void *b);
 
 __global__ void gaSetPara(size_t npop, size_t ngen, size_t * h_order);
 __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
@@ -38,7 +42,6 @@ __device__ bool check(int * person);
 __device__ void scheFCFS(int * person, float * occupy);
 __device__ void personMoveForward(int * person, size_t ele, size_t step);
 __device__ void fixPerson(int * person);
-
 
 
 #endif // ! _GA_CUH_

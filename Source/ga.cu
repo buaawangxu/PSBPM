@@ -164,6 +164,11 @@ void dbDisplayWorld()
 void gaEvolve(size_t npop, size_t ngen)
 {
     size_t i;
+    FILE * fd_info;
+
+    fd_info = fopen("output.txt", "w");
+    assert(fd_info != 0);
+
     gaSetPara<<<1, 1>>>(npop, ngen, h_order);
     size_t msize_occupy;
     msize_occupy = npop * nreso * sizeof(float);
@@ -185,10 +190,12 @@ void gaEvolve(size_t npop, size_t ngen)
         printf("%d generation----------------------\n", i+1);
         gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
-        dbDisplayWorld();
+        gaSelection();
+        gaStatistics(fd_info);
+        // dbDisplayWorld();
         // checkCudaErrors(cudaDeviceSynchronize());
     }
-    
+
 
 }
 
@@ -420,6 +427,32 @@ __device__ void mutation(int * person)
 
 }
 
+/************************************************************************/
+/* calculate fitness value, and move the bests to the parent of next    */
+/*     generation.                                                      */
+/************************************************************************/
+void gaSelection()
+{
+
+    checkCudaErrors(cudaMemcpy(order, h_order, 2*npop * sizeof(size_t), cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpy(fitv, h_fitv, 2*npop * sizeof(float), cudaMemcpyDeviceToHost));
+    qsort(order, 2*npop, sizeof(size_t), fitvalueCompare);
+    checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
+
+}
+
+/************************************************************************/
+/* Statistics of some important information.                            */
+/************************************************************************/
+void gaStatistics(FILE * out)
+{
+    size_t i;
+
+    for (i = 0; i < npop; i++) {
+        fprintf(out, "%f%c", fitv[order[i]], i==npop-1 ? '\n': ' ');
+    }
+}
+
 /****************************************************************************/
 /* return true, if a-th task swap with b-th task; otherwise, return false.  */
 /****************************************************************************/
@@ -577,4 +610,9 @@ __device__ void fixPerson(int * person)
         }
 
     }
+}
+
+static int fitvalueCompare(const void *a, const void *b)
+{
+    return (fitv[(*(size_t *)a)] > fitv[(*(size_t *)b)]) ? 1: -1;
 }
