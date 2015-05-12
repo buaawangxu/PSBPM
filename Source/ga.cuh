@@ -1,3 +1,9 @@
+/**
+ * File: ga.cuh
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #ifndef _GA_CUH_
 #define _GA_CUH_
 
@@ -18,7 +24,7 @@ void dbDisplayWorld();
 void gaEvolve(size_t npop, size_t ngen);
 static void dbPrintPerson(int * person, size_t n, char * tag);
 
-__global__ void gaSetPara(size_t npop, size_t ngen);
+__global__ void gaSetPara(size_t npop, size_t ngen, size_t * h_order);
 __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
 __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fitv);
 __global__ void gaMutation(int * h_chrm, unsigned long * h_hashv, float * h_fitv);

@@ -1,3 +1,9 @@
+/**
+ * File: ga.cu
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <helper_cuda.h>
@@ -9,23 +15,26 @@ __device__ size_t d_ngen;
 
 // chromosome for [sz_taks * d_npop*2]
 int * h_chrm;
-int * h_chrm_s;
 /************************************************************************/
 /* hash value for each person                                           */
 /************************************************************************/
 unsigned long * h_hashv;
-unsigned long * h_hashv_s;
 /************************************************************************/
 /* you can get fitness value like this:                                 */
 /*      h_fitv[ itask-1 ]];                                             */
 /************************************************************************/
 float * h_fitv;
-float * h_fitv_s;
+/************************************************************************/
+/* ordering of each person in our population                            */
+/************************************************************************/
+size_t * h_order;
+__device__ size_t * d_order;
 
 // host data for display result
 int * chrm;
 unsigned long * hashv;
 float * fitv;
+size_t * order;
 
 void cuGaEvolve()
 {
@@ -43,6 +52,8 @@ void cuGaEvolve()
         fprintf(stderr, "ntask = %d (> MAX_CHRM_LEN)\n", ntask);
         exit(1);
     }
+    
+    gaAllocMem();
 
     // Launch a kernel on the GPU with one thread for each element.
     gaEvolve(npop, ngen);
@@ -55,13 +66,15 @@ void cuGaEvolve()
     // any errors encountered during the launch.
     checkCudaErrors(cudaDeviceSynchronize());
 
+    gaFreeMem();
     freeMemOnDevice();
 }
 
-__global__ void gaSetPara(size_t npop, size_t ngen)
+__global__ void gaSetPara(size_t npop, size_t ngen, size_t * h_order)
 {
     d_npop = npop;
     d_ngen = ngen;
+    d_order = h_order;
 }
 
 void gaAllocMem()
@@ -71,21 +84,19 @@ void gaAllocMem()
     // chromosome attribution of a person
     m_size = 2 * npop * ntask * sizeof(int);
     checkCudaErrors(cudaMalloc((void **)&h_chrm, m_size));
-    m_size = npop * ntask * sizeof(int);
-    checkCudaErrors(cudaMalloc((void **)&h_chrm_s, m_size));
 
     
     // hash value attribution of a person
     m_size = 2 * npop * sizeof(unsigned long);
     checkCudaErrors(cudaMalloc((void **)&h_hashv, m_size));
-    m_size = npop * sizeof(unsigned long);
-    checkCudaErrors(cudaMalloc((void **)&h_hashv_s, m_size));
 
     // fitness value attribution of a person
     m_size = 2 * npop * sizeof(float);
     checkCudaErrors(cudaMalloc((void **)&h_fitv, m_size));
-    m_size = npop * sizeof(float);
-    checkCudaErrors(cudaMalloc((void **)&h_fitv_s, m_size));
+
+    // ordering after each selection
+    m_size = 2 * npop * sizeof(size_t);
+    checkCudaErrors(cudaMalloc((void **)&h_order, m_size));
 
 
     chrm = (int *) calloc(2 * npop * ntask, sizeof(int));
@@ -94,20 +105,22 @@ void gaAllocMem()
     assert(hashv != 0);
     fitv = (float *) calloc(2 * npop, sizeof(float));
     assert(fitv != 0);
+    order = (size_t *) calloc(2 * npop, sizeof(size_t));
+    assert(order != 0);
+
 }
 
 void gaFreeMem()
 {
     checkCudaErrors(cudaFree(h_chrm));
-    checkCudaErrors(cudaFree(h_chrm_s));
     checkCudaErrors(cudaFree(h_hashv));
-    checkCudaErrors(cudaFree(h_hashv_s));
     checkCudaErrors(cudaFree(h_fitv));
-    checkCudaErrors(cudaFree(h_fitv_s));
+    checkCudaErrors(cudaFree(h_order));
 
     free(chrm);
     free(hashv);
     free(fitv);
+    free(order);
 }
 
 static void dbPrintPerson(int * person, size_t n, char * tag)
@@ -137,28 +150,34 @@ void dbDisplayWorld()
     printf("parent----\n");
     for (i = 0; i < npop; i++) {;
         char tag[100];
-        sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[i], fitv[i]);
-        dbPrintPerson(chrm+i*ntask, ntask, tag);
+        sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[order[i]], fitv[order[i]]);
+        dbPrintPerson(chrm+ntask*order[i], ntask, tag);
     }    
     printf("children----\n");
     for (i = npop; i < 2*npop; i++) {;
         char tag[100];
-        sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[i], fitv[i]);
-        dbPrintPerson(chrm+i*ntask, ntask, tag);
+        sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[order[i]], fitv[order[i]]);
+        dbPrintPerson(chrm+ntask*order[i], ntask, tag);
     }
 }
 
 void gaEvolve(size_t npop, size_t ngen)
 {
     size_t i;
-    gaSetPara<<<1, 1>>>(npop, ngen);
-    gaAllocMem();
+    gaSetPara<<<1, 1>>>(npop, ngen, h_order);
     size_t msize_occupy;
     msize_occupy = npop * nreso * sizeof(float);
     if (msize_occupy > MAX_SHARED_MEM) {
         fprintf(stderr, "msize_occupy = %d (> MAX_SHARED_MEM(%d))\n", msize_occupy, MAX_SHARED_MEM);
         exit(1);
     }
+
+    for (i = 0; i < 2*npop; i++) {
+        order[i] = i;
+    }
+
+    checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
+
     gaInit<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
     dbDisplayWorld();
 
@@ -167,9 +186,10 @@ void gaEvolve(size_t npop, size_t ngen)
         gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         dbDisplayWorld();
+        // checkCudaErrors(cudaDeviceSynchronize());
     }
+    
 
-    gaFreeMem();
 }
 
 
@@ -183,7 +203,7 @@ __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv)
     extern __shared__ float sh_occupys[];
     float * occupy;
 
-    person = h_chrm + d_ntask * tid;
+    person = h_chrm + d_ntask * d_order[tid];
     occupy = sh_occupys + tid * d_nreso;
 
     size_t i;
@@ -202,9 +222,9 @@ __global__ void gaInit(int * h_chrm, unsigned long * h_hashv, float * h_fitv)
         swapBits(a, b, person);
     }
 
-    h_hashv[tid] = hashfunc(person, d_ntask);
-    h_fitv[tid] = gaObject(person, occupy);
-    // printf("%d %08u %f\n", tid, h_hashv[tid], h_fitv[tid]);
+    h_hashv[d_order[tid]] = hashfunc(person, d_ntask);
+    h_fitv[d_order[tid]] = gaObject(person, occupy);
+    // printf("%d %08u %f\n", d_order[tid], h_hashv[d_order[tid]], h_fitv[d_order[tid]]);
     __syncthreads();
 }
 
@@ -226,10 +246,10 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
     while (needCrossover) { 
         a = randInt(0, d_npop-1);
         b = randInt(0, d_npop-1);
-        dad = h_chrm + a * d_ntask;
-        mom = h_chrm + b * d_ntask;
-        bro = h_chrm + (d_npop + 2*tid) * d_ntask;
-        sis = h_chrm + (d_npop + 2*tid+1) * d_ntask;
+        dad = h_chrm + d_ntask*d_order[a];
+        mom = h_chrm + d_ntask*d_order[b];
+        bro = h_chrm + d_ntask*d_order[d_npop+2*tid];
+        sis = h_chrm + d_ntask*d_order[d_npop+2*tid+1];
 
         crossover(dad, mom, bro, sis);
 
@@ -240,14 +260,19 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
             fixPerson(sis);
         }
 
-        h_hashv[d_npop + 2*tid] = hashfunc(bro, d_ntask);
-        h_hashv[d_npop + 2*tid+1] = hashfunc(sis, d_ntask);
+        unsigned long bro_hash, sis_hash;
+        bro_hash = hashfunc(bro, d_ntask);
+        sis_hash = hashfunc(sis, d_ntask);
+        h_hashv[d_order[d_npop+2*tid]]   = bro_hash;
+        h_hashv[d_order[d_npop+2*tid+1]] = sis_hash;
 
         needCrossover = false;
         for (j = 0; j < d_npop; j++) {
+            // pick j-th person (parent)
+            person = h_chrm + d_ntask*d_order[j];
+
             // check for brother
-            if (h_hashv[d_npop + 2*tid] == h_hashv[j]) {
-                person = h_chrm + j*d_ntask;
+            if (bro_hash == h_hashv[d_order[j]]) {
                 for (k = 0; k < d_ntask; k++) {
                     if (bro[k] != person[k])
                         break;
@@ -259,8 +284,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
                 }
             }
             // check for sister
-            if (h_hashv[d_npop + 2*tid+1] == h_hashv[j]) {
-                person = h_chrm + j*d_ntask;
+            if (sis_hash == h_hashv[d_order[j]]) {
                 for (k = 0; k < d_ntask; k++) {
                     if (sis[k] != person[k])
                         break;
@@ -275,8 +299,8 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
     }
 
     if (!needCrossover) {
-        h_fitv[d_npop + 2*tid] = gaObject(bro, occupy);
-        h_fitv[d_npop + 2*tid+1] = gaObject(sis, occupy);
+        h_fitv[d_order[d_npop+2*tid]]   = gaObject(bro, occupy);
+        h_fitv[d_order[d_npop+2*tid+1]] = gaObject(sis, occupy);
     }
 
     __syncthreads();
@@ -362,17 +386,17 @@ __global__ void gaMutation(int * h_chrm, unsigned long * h_hashv, float * h_fitv
 
     if (randProb() < PROB_MUTATION) {
         // mutate n-th parent
-        person = h_chrm + tid * d_ntask;
+        person = h_chrm + d_ntask*d_order[tid];
         mutation(person);
-        h_hashv[tid] = hashfunc(person, d_ntask);
-        h_fitv[tid] = gaObject(person, occupy);
+        h_hashv[d_order[tid]] = hashfunc(person, d_ntask);
+        h_fitv[d_order[tid]]  = gaObject(person, occupy);
     }
     if (randProb() < PROB_MUTATION) {
         // mutate n-th child
-        person = h_chrm + (tid+d_npop)*d_ntask;
+        person = h_chrm + d_ntask*d_order[tid+d_npop];
         mutation(person);
-        h_hashv[tid+d_npop] = hashfunc(person, d_ntask);
-        h_fitv[tid+d_npop]  = gaObject(person, occupy);
+        h_hashv[d_order[tid+d_npop]] = hashfunc(person, d_ntask);
+        h_fitv[d_order[tid+d_npop]]  = gaObject(person, occupy);
     }
     
     __syncthreads();

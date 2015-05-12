@@ -1,3 +1,9 @@
+/**
+ * File: data.h
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #ifndef  _DATA_H_
 #define  _DATA_H_
 

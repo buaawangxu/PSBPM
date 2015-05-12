@@ -1,3 +1,9 @@
+/**
+ * File: helper.cuh
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #ifndef _HELPER_CUH_
 #define _HELPER_CUH_
 

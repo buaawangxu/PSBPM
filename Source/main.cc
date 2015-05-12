@@ -1,3 +1,9 @@
+/**
+ * File: main.cc
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>

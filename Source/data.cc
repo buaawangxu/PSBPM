@@ -1,3 +1,9 @@
+/**
+ * File: data.cc
+ * Author: Jeanhwea
+ * Email: hujinghui@buaa.edu.cn
+ */
+
 #include "data.h"
 
 size_t ntask;
