@@ -184,7 +184,7 @@ void gaEvolve(size_t npop, size_t ngen)
     checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
 
     gaInit<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
-    dbDisplayWorld();
+    // dbDisplayWorld();
 
     for (i = 0; i < ngen; ++i) {
         printf("%d generation----------------------\n", i+1);
@@ -195,7 +195,8 @@ void gaEvolve(size_t npop, size_t ngen)
         // dbDisplayWorld();
         // checkCudaErrors(cudaDeviceSynchronize());
     }
-
+    
+    dbDisplayWorld();
 
 }
 
@@ -433,10 +434,13 @@ __device__ void mutation(int * person)
 /************************************************************************/
 void gaSelection()
 {
-
-    checkCudaErrors(cudaMemcpy(order, h_order, 2*npop * sizeof(size_t), cudaMemcpyDeviceToHost));
+    // copy fitness value form device
     checkCudaErrors(cudaMemcpy(fitv, h_fitv, 2*npop * sizeof(float), cudaMemcpyDeviceToHost));
+
+    // sort individual by fitness value
     qsort(order, 2*npop, sizeof(size_t), fitvalueCompare);
+
+    // transfer the order after sorting
     checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
 
 }
