@@ -21,6 +21,7 @@ void cuGaEvolve();
 void gaAllocMem();
 void gaFreeMem();
 void dbDisplayWorld();
+void dbPrintResult(FILE * out);
 void gaEvolve(size_t npop, size_t ngen);
 void gaSelection();
 void gaStatistics(FILE * out);

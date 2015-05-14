@@ -38,7 +38,10 @@ size_t * order;
 
 void cuGaEvolve()
 {
-    
+    StopWatchInterface * timer = NULL;
+    float elapse_time_inMs = 0.0f;
+    cudaEvent_t start, stop;
+
     // Choose which GPU to run on, change this on a multi-GPU system.
     checkCudaErrors(cudaSetDevice(0));
 
@@ -55,8 +58,24 @@ void cuGaEvolve()
     
     gaAllocMem();
 
+    // starting timer ...
+    sdkCreateTimer(&timer);
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&stop));
+    checkCudaErrors(cudaThreadSynchronize());
+    sdkStartTimer(&timer);
+    checkCudaErrors(cudaEventRecord(start, 0));
+
     // Launch a kernel on the GPU with one thread for each element.
     gaEvolve(npop, ngen);
+
+    checkCudaErrors(cudaEventRecord(stop, 0));
+    checkCudaErrors(cudaDeviceSynchronize());
+    sdkStopTimer(&timer);
+    checkCudaErrors(cudaEventElapsedTime(&elapse_time_inMs, start, stop));
+    elapse_time_inMs = sdkGetTimerValue(&timer);
+    checkCudaErrors(cudaEventDestroy(start));
+    checkCudaErrors(cudaEventDestroy(stop));
 
     // Check for any errors launching the kernel
     checkCudaErrors(cudaGetLastError());
@@ -65,6 +84,8 @@ void cuGaEvolve()
     // cudaDeviceSynchronize waits for the kernel to finish, and returns
     // any errors encountered during the launch.
     checkCudaErrors(cudaDeviceSynchronize());
+
+    printf("total time in GPU = %f ms\n", elapse_time_inMs);
 
     gaFreeMem();
     freeMemOnDevice();
@@ -152,7 +173,7 @@ void dbDisplayWorld()
         char tag[100];
         sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[order[i]], fitv[order[i]]);
         dbPrintPerson(chrm+ntask*order[i], ntask, tag);
-    }    
+    }
     printf("children----\n");
     for (i = npop; i < 2*npop; i++) {;
         char tag[100];
@@ -161,12 +182,26 @@ void dbDisplayWorld()
     }
 }
 
+void dbPrintResult(FILE * out)
+{
+    size_t i, j;
+
+    checkCudaErrors(cudaMemcpy(chrm, h_chrm, 2*npop * ntask * sizeof(int), cudaMemcpyDeviceToHost));
+    for (i = 0; i < 3; i++) {
+        int * person = chrm+ntask*order[i];
+        for (j = 0; j < ntask; j++) {
+            fprintf(out, "%d%c", person[j] ,j==(ntask-1)? '\n': ' ');
+        }
+    }
+}
+
 void gaEvolve(size_t npop, size_t ngen)
 {
     size_t i;
-    FILE * fd_info;
+    FILE * fd_info, * fd_resu;
 
     fd_info = fopen("output.txt", "w");
+    fd_resu = fopen("result.txt", "w");
     assert(fd_info != 0);
 
     gaSetPara<<<1, 1>>>(npop, ngen, h_order);
@@ -187,7 +222,7 @@ void gaEvolve(size_t npop, size_t ngen)
     // dbDisplayWorld();
 
     for (i = 0; i < ngen; ++i) {
-        printf("%d generation----------------------\n", i+1);
+        // printf("%d generation----------------------\n", i+1);
         gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaSelection();
@@ -196,8 +231,11 @@ void gaEvolve(size_t npop, size_t ngen)
         // checkCudaErrors(cudaDeviceSynchronize());
     }
     
-    dbDisplayWorld();
+    // dbDisplayWorld();
+    dbPrintResult(fd_resu);
 
+    fclose(fd_info);
+    fclose(fd_resu);
 }
 
 

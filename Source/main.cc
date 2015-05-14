@@ -21,13 +21,13 @@ int main(int argc, char **argv)
     // string full_filename = "tmp/C-softchoice.com.mpp";
     if (argc > 1)
         full_filename = argv[1];
-    string cmd = "java -jar parser.jar " + full_filename;
-    int ret_code = 0;
-    ret_code = system(cmd.c_str());
-    cout.flush();
-    if (ret_code != 0) {
-        return 0;
-    }
+    // string cmd = "java -jar parser.jar " + full_filename;
+    // int ret_code = 0;
+    // ret_code = system(cmd.c_str());
+    // cout.flush();
+    // if (ret_code != 0) {
+    //     return 0;
+    // }
 
     string xml_filename;
     int index_dot = full_filename.find_last_of('.');

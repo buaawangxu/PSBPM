@@ -46,4 +46,5 @@ Source/tinyxml/doc/*
 
 # some output files
 output*
+result*
 
