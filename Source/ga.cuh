@@ -26,7 +26,7 @@ void gaEvolve(size_t npop, size_t ngen);
 void gaSelection();
 void gaStatistics(FILE * out);
 
-static void dbPrintPerson(int * person, size_t n, char * tag);
+static void dbPrintPerson(int * person, size_t n, char * tag, FILE * out);
 static int fitvalueCompare(const void *a, const void *b);
 
 __global__ void gaSetPara(size_t npop, size_t ngen, size_t * h_order);

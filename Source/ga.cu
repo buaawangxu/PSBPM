@@ -84,8 +84,9 @@ void cuGaEvolve()
     // cudaDeviceSynchronize waits for the kernel to finish, and returns
     // any errors encountered during the launch.
     checkCudaErrors(cudaDeviceSynchronize());
-
-    printf("total time in GPU = %f ms\n", elapse_time_inMs);
+    
+    //printf("total time in GPU = %f ms\n", elapse_time_inMs);
+    printf("%f ms\n", elapse_time_inMs);
 
     gaFreeMem();
     freeMemOnDevice();
@@ -144,41 +145,41 @@ void gaFreeMem()
     free(order);
 }
 
-static void dbPrintPerson(int * person, size_t n, char * tag)
+static void dbPrintPerson(int * person, size_t n, char * tag, FILE * out)
 {
     size_t i;
 
-    printf("%s : ", tag);
+    fprintf(out, "%s : ", tag);
     for (i = 0; i < n; i++) {
-        printf("%d", person[i]);
+        fprintf(out, "%d", person[i]);
         if (i < n-1) {
-            printf("->");
+            fprintf(out, "->");
         } else {
-            printf("\n");
+            fprintf(out, "\n");
         }
     }
 
 }
 
-void dbDisplayWorld()
+void dbDisplayWorld(FILE * out)
 {
     size_t i;
 
     checkCudaErrors(cudaMemcpy(chrm, h_chrm, 2*npop * ntask * sizeof(int), cudaMemcpyDeviceToHost));
     checkCudaErrors(cudaMemcpy(hashv, h_hashv, 2*npop * sizeof(unsigned long), cudaMemcpyDeviceToHost));
     checkCudaErrors(cudaMemcpy(fitv, h_fitv, 2*npop * sizeof(float), cudaMemcpyDeviceToHost));
-
-    printf("parent----\n");
+    checkCudaErrors(cudaDeviceSynchronize());
+    fprintf(out, "parent----\n");
     for (i = 0; i < npop; i++) {;
         char tag[100];
         sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[order[i]], fitv[order[i]]);
-        dbPrintPerson(chrm+ntask*order[i], ntask, tag);
+        dbPrintPerson(chrm+ntask*order[i], ntask, tag, out);
     }
-    printf("children----\n");
+    fprintf(out, "children----\n");
     for (i = npop; i < 2*npop; i++) {;
         char tag[100];
         sprintf(tag, "i%04d\th%08u\tf%f\t",i, hashv[order[i]], fitv[order[i]]);
-        dbPrintPerson(chrm+ntask*order[i], ntask, tag);
+        dbPrintPerson(chrm+ntask*order[i], ntask, tag, out);
     }
 }
 
@@ -187,6 +188,7 @@ void dbPrintResult(FILE * out)
     size_t i, j;
 
     checkCudaErrors(cudaMemcpy(chrm, h_chrm, 2*npop * ntask * sizeof(int), cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaDeviceSynchronize());
     for (i = 0; i < 3; i++) {
         int * person = chrm+ntask*order[i];
         for (j = 0; j < ntask; j++) {
@@ -198,10 +200,11 @@ void dbPrintResult(FILE * out)
 void gaEvolve(size_t npop, size_t ngen)
 {
     size_t i;
-    FILE * fd_info, * fd_resu;
+    FILE * fd_info, * fd_resu, * fd_chom;
 
     fd_info = fopen("output.txt", "w");
     fd_resu = fopen("result.txt", "w");
+    fd_chom = fopen("chomes.txt", "w");
     assert(fd_info != 0);
 
     gaSetPara<<<1, 1>>>(npop, ngen, h_order);
@@ -219,23 +222,24 @@ void gaEvolve(size_t npop, size_t ngen)
     checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
 
     gaInit<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
-    // dbDisplayWorld();
+    dbDisplayWorld(fd_chom);
 
     for (i = 0; i < ngen; ++i) {
-        // printf("%d generation----------------------\n", i+1);
+        fprintf(fd_chom,"%d generation----------------------\n", i+1);
         gaCrossover<<<1, npop/2, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaMutation<<<1, npop, msize_occupy>>>(h_chrm, h_hashv, h_fitv);
         gaSelection();
         gaStatistics(fd_info);
-        // dbDisplayWorld();
-        // checkCudaErrors(cudaDeviceSynchronize());
+        dbDisplayWorld(fd_chom);
+        checkCudaErrors(cudaDeviceSynchronize());
     }
     
-    // dbDisplayWorld();
+    dbDisplayWorld(fd_chom);
     dbPrintResult(fd_resu);
 
     fclose(fd_info);
     fclose(fd_resu);
+    fclose(fd_chom);
 }
 
 
@@ -342,6 +346,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
                 }
             }
         }
+        __syncthreads();
     }
 
     if (!needCrossover) {
@@ -480,6 +485,7 @@ void gaSelection()
 
     // transfer the order after sorting
     checkCudaErrors(cudaMemcpy(h_order, order, 2*npop * sizeof(size_t), cudaMemcpyHostToDevice));
+
 
 }
 
