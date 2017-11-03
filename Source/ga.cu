@@ -360,7 +360,7 @@ __global__ void gaCrossover(int * h_chrm, unsigned long * h_hashv, float * h_fit
 /************************************************************************/
 /* ordering-based two points crossover                                  */
 /************************************************************************/
-__device__ void crossover(int * dad, int * mom, int * bro, int * sis)
+__device__ void gaCrossover(int * dad, int * mom, int * bro, int * sis)
 {
     size_t i, j, k, a, b;
     int dad_new[MAX_CHRM_LEN], mom_new[MAX_CHRM_LEN];
@@ -456,7 +456,7 @@ __global__ void gaMutation(int * h_chrm, unsigned long * h_hashv, float * h_fitv
 /************************************************************************/
 /* two points swap mutation                                             */
 /************************************************************************/
-__device__ void mutation(int * person)
+__device__ void gaMutation(int * person)
 {
     size_t a, b;
 
